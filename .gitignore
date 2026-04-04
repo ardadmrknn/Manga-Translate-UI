@@ -1,0 +1,19 @@
+# Python cache and environments
+__pycache__/
+*.py[cod]
+.venv/
+
+# Runtime cache and logs
+.litert_cache/
+app.log
+
+# Local user data and machine-specific settings
+settings.json
+translation_history.json
+
+# Local environment and credentials
+.env
+.env.*
+credentials.json
+service-account*.json
+*credentials*.json

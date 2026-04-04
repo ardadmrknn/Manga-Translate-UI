@@ -1,0 +1,18 @@
+Pillow
+mss
+pytesseract
+opencv-python
+numpy
+keyboard
+google-generativeai
+google-cloud-translate
+google-cloud-vision
+google-cloud-bigquery
+litert-lm; platform_system != "Windows"
+
+# External dependency required for OCR:
+# Install the Tesseract OCR application separately and add it to PATH.
+
+# Note for local Gemma translation:
+# LiteRT-LM currently does not provide a working dependency set for this Windows venv.
+# Use Linux/WSL2 for local Gemma support, or switch translator engine to Google/Gemini on Windows.
