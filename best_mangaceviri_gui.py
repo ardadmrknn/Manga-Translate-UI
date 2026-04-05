@@ -45,9 +45,9 @@ TARGET_LANGUAGE_OPTIONS = [
 ]
 PREPROCESSING_LABELS = {
     "normal": "Normal",
-    "denoise": "Gurultu Azalt",
-    "sharpen": "Keskinlestir",
-    "high_contrast": "Yuksek Kontrast",
+    "denoise": "Gürültü Azalt",
+    "sharpen": "Keskinleştir",
+    "high_contrast": "Yüksek Kontrast",
 }
 PREPROCESSING_DISPLAY = list(PREPROCESSING_LABELS.values())
 PREPROCESSING_REVERSE = {value: key for key, value in PREPROCESSING_LABELS.items()}
@@ -122,6 +122,41 @@ class SettingsManager:
         return self.settings.get(key, self.defaults.get(key))
 
 
+class ScrollableFrame(tk.Frame):
+    def __init__(self, parent, bg_color, *args, **kwargs):
+        super().__init__(parent, bg=bg_color, *args, **kwargs)
+        self.canvas = tk.Canvas(self, bg=bg_color, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=bg_color)
+        
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+        self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        
+        self.canvas.bind(
+            "<Configure>",
+            lambda e: self.canvas.itemconfig(self.window_id, width=e.width)
+        )
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _on_mousewheel(self, event):
+        try:
+            x, y = self.canvas.winfo_pointerxy()
+            widget = self.canvas.winfo_containing(x, y)
+            if widget and str(widget).startswith(str(self)):
+                # Ensure the scrollable text widget doesn't get captured by this if we are scrolling over it
+                if not isinstance(widget, tk.Text):
+                    self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        except tk.TclError:
+            pass
+
 class CardFrame(tk.Frame):
     def __init__(self, parent, title, subtitle=None, **kwargs):
         super().__init__(parent, bg=APP_THEME["surface"], highlightthickness=1, highlightbackground=APP_THEME["border"], **kwargs)
@@ -159,18 +194,20 @@ class ModernSettingsWindow(tk.Toplevel):
         shell = tk.Frame(self, bg=APP_THEME["bg"])
         shell.pack(fill=tk.BOTH, expand=True, padx=18, pady=18)
 
-        tk.Label(shell, text="Uygulama Ayarlari", bg=APP_THEME["bg"], fg=APP_THEME["text"], font=("Segoe UI Semibold", 17)).pack(anchor="w")
-        tk.Label(shell, text="Kisayollari ve varsayilan davranisi buradan yonetebilirsiniz.", bg=APP_THEME["bg"], fg=APP_THEME["muted"], font=("Segoe UI", 10)).pack(anchor="w", pady=(4, 14))
+        tk.Label(shell, text="Uygulama Ayarları", bg=APP_THEME["bg"], fg=APP_THEME["text"], font=("Segoe UI Semibold", 17)).pack(anchor="w")
+        lbl = tk.Label(shell, text="Kısayolları ve varsayılan davranışı buradan yönetebilirsiniz.", bg=APP_THEME["bg"], fg=APP_THEME["muted"], font=("Segoe UI", 10), justify=tk.LEFT)
+        lbl.pack(anchor="w", fill=tk.X, expand=True, pady=(4, 14))
+        lbl.bind("<Configure>", lambda e, l=lbl: l.configure(wraplength=e.width))
 
-        hotkeys_card = CardFrame(shell, "Global Kisayollar", "Tus kutusuna odaklanip yeni kombinasyonu basin.")
+        hotkeys_card = CardFrame(shell, "Global Kısayollar", "Tuş kutusuna odaklanıp yeni kombinasyonu basın.")
         hotkeys_card.pack(fill=tk.X)
 
         labels = {
-            "translate": "Ceviri baslat",
-            "select_area": "Alan sec",
-            "history": "Gecmisi ac",
-            "toggle_persistent_border": "Cerceveyi ac veya kapat",
-            "overlay": "Overlay ceviri",
+            "translate": "Çeviri başlat",
+            "select_area": "Alan seç",
+            "history": "Geçmişi aç",
+            "toggle_persistent_border": "Çerçeveyi aç veya kapat",
+            "overlay": "Overlay çeviri",
             "close_overlay": "Overlay kapat",
         }
 
@@ -185,16 +222,16 @@ class ModernSettingsWindow(tk.Toplevel):
             entry.bind("<KeyRelease>", lambda event, var=variable: self.capture_hotkey(event, var))
             self.hotkey_vars[action] = variable
 
-        options_card = CardFrame(shell, "Davranis", "Kucuk ama etkili kolaylik ayarlari.")
+        options_card = CardFrame(shell, "Davranış", "Küçük ama etkili kolaylık ayarları.")
         options_card.pack(fill=tk.X, pady=(14, 0))
         self.auto_translate_var = BooleanVar(value=self.parent_gui.auto_translate_var.get())
         self.show_border_var = BooleanVar(value=self.parent_gui.show_persistent_border_var.get())
-        tk.Checkbutton(options_card.body, text="Alan seciminden sonra otomatik cevir", variable=self.auto_translate_var, bg=APP_THEME["surface"], fg=APP_THEME["text"], activebackground=APP_THEME["surface"], selectcolor=APP_THEME["surface"], font=("Segoe UI", 10)).pack(anchor="w")
-        tk.Checkbutton(options_card.body, text="Baslangicta surekli cerceveyi acik tut", variable=self.show_border_var, bg=APP_THEME["surface"], fg=APP_THEME["text"], activebackground=APP_THEME["surface"], selectcolor=APP_THEME["surface"], font=("Segoe UI", 10)).pack(anchor="w", pady=(8, 0))
+        tk.Checkbutton(options_card.body, text="Alan seçiminden sonra otomatik çevir", variable=self.auto_translate_var, bg=APP_THEME["surface"], fg=APP_THEME["text"], activebackground=APP_THEME["surface"], selectcolor=APP_THEME["surface"], font=("Segoe UI", 10)).pack(anchor="w")
+        tk.Checkbutton(options_card.body, text="Başlangıçta sürekli çerçeveyi açık tut", variable=self.show_border_var, bg=APP_THEME["surface"], fg=APP_THEME["text"], activebackground=APP_THEME["surface"], selectcolor=APP_THEME["surface"], font=("Segoe UI", 10)).pack(anchor="w", pady=(8, 0))
 
         footer = tk.Frame(shell, bg=APP_THEME["bg"])
         footer.pack(fill=tk.X, pady=(16, 0))
-        ttk.Button(footer, text="Iptal", command=self.destroy).pack(side=tk.RIGHT)
+        ttk.Button(footer, text="İptal", command=self.destroy).pack(side=tk.RIGHT)
         ttk.Button(footer, text="Kaydet", command=self.save).pack(side=tk.RIGHT, padx=(0, 8))
 
     def capture_hotkey(self, event, variable):
@@ -235,7 +272,7 @@ class HistoryWindow:
         self.parent_gui = parent_gui
         self.translator = translator
         self.window = tk.Toplevel(parent_gui.root)
-        self.window.title("Ceviri Gecmisi")
+        self.window.title("Çeviri Geçmişi")
         self.window.geometry("1120x680")
         self.window.minsize(980, 560)
         self.window.transient(parent_gui.root)
@@ -250,8 +287,10 @@ class HistoryWindow:
         shell = tk.Frame(self.window, bg=APP_THEME["bg"])
         shell.pack(fill=tk.BOTH, expand=True, padx=18, pady=18)
 
-        tk.Label(shell, text="Ceviri Gecmisi", bg=APP_THEME["bg"], fg=APP_THEME["text"], font=("Segoe UI Semibold", 17)).pack(anchor="w")
-        tk.Label(shell, text="Arama yapin, kayitlari inceleyin veya gecmisi temizleyin.", bg=APP_THEME["bg"], fg=APP_THEME["muted"], font=("Segoe UI", 10)).pack(anchor="w", pady=(4, 12))
+        tk.Label(shell, text="Çeviri Geçmişi", bg=APP_THEME["bg"], fg=APP_THEME["text"], font=("Segoe UI Semibold", 17)).pack(anchor="w")
+        lbl = tk.Label(shell, text="Arama yapın, kayıtları inceleyin veya geçmişi temizleyin.", bg=APP_THEME["bg"], fg=APP_THEME["muted"], font=("Segoe UI", 10), justify=tk.LEFT)
+        lbl.pack(anchor="w", fill=tk.X, expand=True, pady=(4, 12))
+        lbl.bind("<Configure>", lambda e, l=lbl: l.configure(wraplength=e.width))
 
         toolbar = tk.Frame(shell, bg=APP_THEME["bg"])
         toolbar.pack(fill=tk.X, pady=(0, 12))
@@ -263,10 +302,10 @@ class HistoryWindow:
         ttk.Button(toolbar, text="Yenile", command=self.load_history).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(toolbar, text="Temizle", command=self.clear_history).pack(side=tk.LEFT, padx=(8, 0))
 
-        table_card = CardFrame(shell, "Kayitlar", "Son 100 ceviri burada listelenir.")
+        table_card = CardFrame(shell, "Kayıtlar", "Son 100 çeviri burada listelenir.")
         table_card.pack(fill=tk.BOTH, expand=True)
 
-        columns = ("Tarih", "Kaynak", "Hedef", "Orijinal", "Ceviri", "OCR", "Motor")
+        columns = ("Tarih", "Kaynak", "Hedef", "Orijinal", "Çeviri", "OCR", "Motor")
         self.tree = ttk.Treeview(table_card.body, columns=columns, show="headings", height=16)
         widths = {"Tarih": 145, "Kaynak": 80, "Hedef": 80, "Orijinal": 260, "Ceviri": 260, "OCR": 100, "Motor": 100}
         for column in columns:
@@ -279,7 +318,7 @@ class HistoryWindow:
         self.tree.bind("<<TreeviewSelect>>", self.show_detail)
         self.tree.bind("<Double-1>", self.show_detail)
 
-        detail_card = CardFrame(shell, "Detay", "Secilen kaydin tam icerigi.")
+        detail_card = CardFrame(shell, "Detay", "Seçilen kaydın tam içeriği.")
         detail_card.pack(fill=tk.BOTH, expand=True, pady=(14, 0))
         self.detail_text = scrolledtext.ScrolledText(detail_card.body, wrap=tk.WORD, font=("Segoe UI", 10), bg=APP_THEME["panel"], fg=APP_THEME["text"], relief=tk.FLAT, insertbackground=APP_THEME["text"])
         self.detail_text.pack(fill=tk.BOTH, expand=True)
@@ -305,7 +344,7 @@ class HistoryWindow:
             self.tree.delete(item)
         for row in self.rows_from_results(results):
             self.tree.insert("", "end", values=row[:-1], tags=(row[-1],))
-        self.write_detail("Kayit secildiginde detay burada gosterilir.")
+        self.write_detail("Kayıt seçildiğinde detay burada gösterilir.")
 
     def on_search(self, _event=None):
         query = self.search_var.get().strip()
@@ -333,7 +372,7 @@ class HistoryWindow:
         try:
             payload = json.loads(item["tags"][0])
         except (KeyError, IndexError, json.JSONDecodeError):
-            self.write_detail("Detay verisi okunamadi.")
+            self.write_detail("Detay verisi okunamadı.")
             return
         detail = (
             f"Tarih: {payload.get('timestamp', '')}\n"
@@ -346,7 +385,7 @@ class HistoryWindow:
         self.write_detail(detail)
 
     def clear_history(self):
-        if messagebox.askyesno("Gecmisi Temizle", "Tum ceviri gecmisi silinsin mi?", parent=self.window):
+        if messagebox.askyesno("Geçmişi Temizle", "Tüm çeviri geçmişi silinsin mi?", parent=self.window):
             self.translator.clear_translation_history()
             self.load_history()
 
@@ -355,7 +394,7 @@ class ResultsPopoutWindow(tk.Toplevel):
     def __init__(self, parent_gui):
         super().__init__(parent_gui.root)
         self.parent_gui = parent_gui
-        self.title("Sonuclar")
+        self.title("Sonuçlar")
         self.geometry("980x520")
         self.minsize(860, 420)
         self.configure(bg=APP_THEME["bg"])
@@ -367,7 +406,7 @@ class ResultsPopoutWindow(tk.Toplevel):
         pane.pack(fill=tk.BOTH, expand=True)
 
         original_card = CardFrame(pane, "Orijinal", "Yakalanan OCR metni")
-        translated_card = CardFrame(pane, "Ceviri", "Duzenlenebilir ceviri paneli")
+        translated_card = CardFrame(pane, "Ceviri", "Düzenlenebilir çeviri paneli")
         pane.add(original_card, weight=1)
         pane.add(translated_card, weight=1)
 
@@ -484,8 +523,9 @@ class TranslatorGUI:
         self.popout_window = None
         self.last_original_translation = ""
         self._updating_text = False
+        self.translator_engine_buttons = {}
 
-        self.root.title("Manga Cevirici")
+        self.root.title("Manga Çevirici")
         self.root.configure(bg=APP_THEME["bg"])
         self.root.geometry(self.settings_manager.get("window_geometry"))
         self.root.minsize(1120, 760)
@@ -496,17 +536,18 @@ class TranslatorGUI:
         try:
             self.translator = ScreenTranslator(local_model_path=self.local_model_path)
         except Exception as error:
-            messagebox.showerror("Baslatma Hatasi", f"Cevirici baslatilamadi:\n{error}")
+            messagebox.showerror("Başlatma Hatası", f"Cevirici baslatilamadi:\n{error}")
             self.root.destroy()
             return
 
         self.build_ui()
+        self.update_local_gemma_availability()
         self.setup_global_hotkeys()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         if self.show_persistent_border_var.get():
             self.update_persistent_border()
-        self.set_status("Hazir. Alan secip ceviri baslatabilirsiniz.", "ready")
+        self.set_status("Hazır. Alan seçip çeviri başlatabilirsiniz.", "ready")
 
     def configure_styles(self):
         style = ttk.Style()
@@ -544,7 +585,10 @@ class TranslatorGUI:
         self.local_model_path = self.settings_manager.get("local_model").get("path", DEFAULT_LOCAL_GEMMA_MODEL_PATH)
 
     def build_ui(self):
-        shell = tk.Frame(self.root, bg=APP_THEME["bg"])
+        self.main_scroll = ScrollableFrame(self.root, APP_THEME["bg"])
+        self.main_scroll.pack(fill=tk.BOTH, expand=True)
+
+        shell = tk.Frame(self.main_scroll.scrollable_frame, bg=APP_THEME["bg"])
         shell.pack(fill=tk.BOTH, expand=True, padx=18, pady=18)
         shell.columnconfigure(0, weight=0, minsize=365)
         shell.columnconfigure(1, weight=1)
@@ -556,13 +600,15 @@ class TranslatorGUI:
 
         title_wrap = tk.Frame(header, bg=APP_THEME["bg"])
         title_wrap.grid(row=0, column=0, sticky="w")
-        tk.Label(title_wrap, text="Manga Cevirici", bg=APP_THEME["bg"], fg=APP_THEME["text"], font=("Segoe UI Semibold", 24)).pack(anchor="w")
-        tk.Label(title_wrap, text="Secili bolgeden OCR alip sonucu daha temiz ve hizli bir akisla sunar.", bg=APP_THEME["bg"], fg=APP_THEME["muted"], font=("Segoe UI", 10)).pack(anchor="w", pady=(4, 0))
+        tk.Label(title_wrap, text="Manga Çevirici", bg=APP_THEME["bg"], fg=APP_THEME["text"], font=("Segoe UI Semibold", 24)).pack(anchor="w")
+        lbl = tk.Label(title_wrap, text="Seçili bölgeden OCR alıp sonucu daha temiz ve hızlı bir akışla sunar.", bg=APP_THEME["bg"], fg=APP_THEME["muted"], font=("Segoe UI", 10), justify=tk.LEFT)
+        lbl.pack(anchor="w", fill=tk.X, expand=True, pady=(4, 0))
+        lbl.bind("<Configure>", lambda e, l=lbl: l.configure(wraplength=e.width))
 
         pill_bar = tk.Frame(header, bg=APP_THEME["bg"])
         pill_bar.grid(row=0, column=1, sticky="e")
-        StatusPill(pill_bar, "F1 Cevir", APP_THEME["accent_soft"], APP_THEME["accent_alt"]).pack(side=tk.LEFT, padx=(0, 8))
-        StatusPill(pill_bar, "F2 Alan Sec", APP_THEME["panel_alt"]).pack(side=tk.LEFT, padx=(0, 8))
+        StatusPill(pill_bar, "F1 Çevir", APP_THEME["accent_soft"], APP_THEME["accent_alt"]).pack(side=tk.LEFT, padx=(0, 8))
+        StatusPill(pill_bar, "F2 Alan Seç", APP_THEME["panel_alt"]).pack(side=tk.LEFT, padx=(0, 8))
         StatusPill(pill_bar, "F5 Overlay", APP_THEME["panel_alt"]).pack(side=tk.LEFT)
 
         sidebar = tk.Frame(shell, bg=APP_THEME["bg"])
@@ -579,28 +625,28 @@ class TranslatorGUI:
             variable.trace_add("write", lambda *_args: self.refresh_summary())
 
     def build_sidebar(self, parent):
-        region_card = CardFrame(parent, "Yakalama Alani", "Alan secimi, koordinatlar ve hizli aksiyonlar.")
+        region_card = CardFrame(parent, "Yakalama Alanı", "Alan seçimi, koordinatlar ve hızlı aksiyonlar.")
         region_card.pack(fill=tk.X)
         grid = tk.Frame(region_card.body, bg=APP_THEME["surface"])
         grid.pack(fill=tk.X)
         for column in range(2):
             grid.columnconfigure(column, weight=1)
         self.make_labeled_entry(grid, "Sol", self.left_var, 0, 0)
-        self.make_labeled_entry(grid, "Ust", self.top_var, 0, 1)
-        self.make_labeled_entry(grid, "Genislik", self.width_var, 1, 0)
-        self.make_labeled_entry(grid, "Yukseklik", self.height_var, 1, 1)
+        self.make_labeled_entry(grid, "Üst", self.top_var, 0, 1)
+        self.make_labeled_entry(grid, "Genişlik", self.width_var, 1, 0)
+        self.make_labeled_entry(grid, "Yükseklik", self.height_var, 1, 1)
 
         action_row = tk.Frame(region_card.body, bg=APP_THEME["surface"])
         action_row.pack(fill=tk.X, pady=(14, 0))
-        ttk.Button(action_row, text="Alan Sec", command=self.start_area_selection).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ttk.Button(action_row, text="Cerceveyi Goster", command=self.toggle_persistent_border).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(8, 0))
+        ttk.Button(action_row, text="Alan Seç", command=self.start_area_selection).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Button(action_row, text="Çerçeveyi Göster", command=self.toggle_persistent_border).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(8, 0))
 
-        tk.Checkbutton(region_card.body, text="Secimden sonra otomatik cevir", variable=self.auto_translate_var, bg=APP_THEME["surface"], fg=APP_THEME["text"], activebackground=APP_THEME["surface"], selectcolor=APP_THEME["surface"], font=("Segoe UI", 10)).pack(anchor="w", pady=(14, 0))
+        tk.Checkbutton(region_card.body, text="Seçimden sonra otomatik çevir", variable=self.auto_translate_var, bg=APP_THEME["surface"], fg=APP_THEME["text"], activebackground=APP_THEME["surface"], selectcolor=APP_THEME["surface"], font=("Segoe UI", 10)).pack(anchor="w", pady=(14, 0))
 
-        engine_card = CardFrame(parent, "Motorlar", "OCR ve ceviri motorunu goreve gore eslestirin.")
+        engine_card = CardFrame(parent, "Motorlar", "OCR ve çeviri motorunu göreve göre eşleştirin.")
         engine_card.pack(fill=tk.X, pady=(14, 0))
         self.build_radio_group(engine_card.body, "OCR", self.ocr_method_var, [("Tesseract", "tesseract"), ("Cloud Vision", "cloud_vision"), ("Gemini Vision", "gemini")], command=self.toggle_gemini_controls)
-        self.build_radio_group(engine_card.body, "Ceviri", self.translator_engine_var, [("Yerel Gemma", "local_gemma"), ("Gemini", "gemini"), ("Google Cloud", "google")])
+        self.translator_engine_buttons = self.build_radio_group(engine_card.body, "Ceviri", self.translator_engine_var, [("Yerel Gemma", "local_gemma"), ("Gemini", "gemini"), ("Google Cloud", "google")])
 
         gemini_row = tk.Frame(engine_card.body, bg=APP_THEME["surface"])
         gemini_row.pack(fill=tk.X, pady=(12, 0))
@@ -610,12 +656,14 @@ class TranslatorGUI:
 
         preprocess_row = tk.Frame(engine_card.body, bg=APP_THEME["surface"])
         preprocess_row.pack(fill=tk.X, pady=(12, 0))
-        tk.Label(preprocess_row, text="On Isleme", bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI Semibold", 9)).pack(anchor="w")
+        tk.Label(preprocess_row, text="Ön İşleme", bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI Semibold", 9)).pack(anchor="w")
         ttk.Combobox(preprocess_row, state="readonly", values=PREPROCESSING_DISPLAY, textvariable=self.preprocessing_profile_var).pack(fill=tk.X, pady=(6, 0))
 
         tk.Label(engine_card.body, text=f"Model: {os.path.basename(self.local_model_path)}", bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI", 9), wraplength=290, justify=tk.LEFT).pack(anchor="w", pady=(12, 0))
+        self.local_gemma_hint_label = tk.Label(engine_card.body, text="", bg=APP_THEME["surface"], fg=APP_THEME["warning"], font=("Segoe UI", 9), wraplength=290, justify=tk.LEFT)
+        self.local_gemma_hint_label.pack(anchor="w", pady=(6, 0))
 
-        language_card = CardFrame(parent, "Dil ve Akis", "Kaynak ve hedef dili degistirin; manga veya oyun modunu secin.")
+        language_card = CardFrame(parent, "Dil ve Akış", "Kaynak ve hedef dili değiştirin; manga veya oyun modunu seçin.")
         language_card.pack(fill=tk.X, pady=(14, 0))
         lang_row = tk.Frame(language_card.body, bg=APP_THEME["surface"])
         lang_row.pack(fill=tk.X)
@@ -623,35 +671,35 @@ class TranslatorGUI:
         lang_row.columnconfigure(1, weight=1)
         self.make_labeled_combo(lang_row, "Kaynak Dil", self.source_lang_var, LANGUAGE_OPTIONS, 0, 0)
         self.make_labeled_combo(lang_row, "Hedef Dil", self.target_lang_var, TARGET_LANGUAGE_OPTIONS, 0, 1)
-        self.build_radio_group(language_card.body, "Yerlesim", self.layout_mode_var, [("Oyun", "game"), ("Manga", "manga")])
+        self.build_radio_group(language_card.body, "Yerleşim", self.layout_mode_var, [("Oyun", "game"), ("Manga", "manga")])
 
-        utility_card = CardFrame(parent, "Yardimci Isler", "Ayarlar, gecmis ve disa aktarma tek yerde.")
+        utility_card = CardFrame(parent, "Yardımcı İşler", "Ayarlar, geçmiş ve dışa aktarma tek yerde.")
         utility_card.pack(fill=tk.X, pady=(14, 0))
         ttk.Button(utility_card.body, text="Ayarlar", command=self.open_settings_window).pack(fill=tk.X)
-        ttk.Button(utility_card.body, text="Ceviri Gecmisi", command=self.open_history).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(utility_card.body, text="Sonuclari Disa Aktar", command=self.export_results).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(utility_card.body, text="Çeviri Geçmişi", command=self.open_history).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(utility_card.body, text="Sonuçları Dışa Aktar", command=self.export_results).pack(fill=tk.X, pady=(8, 0))
 
         self.toggle_gemini_controls()
 
     def build_main(self, parent):
-        control_card = CardFrame(parent, "Hizli Aksiyonlar", "Ana is akisi tek satirda toplandi.")
+        control_card = CardFrame(parent, "Hızlı Aksiyonlar", "Ana iş akışı tek satırda toplandı.")
         control_card.grid(row=0, column=0, sticky="ew")
 
         button_row = tk.Frame(control_card.body, bg=APP_THEME["surface"])
         button_row.pack(fill=tk.X)
-        self.translate_button = ttk.Button(button_row, text="Simdi Cevir", style="Accent.TButton", command=self.perform_single_translation)
+        self.translate_button = ttk.Button(button_row, text="Şimdi Çevir", style="Accent.TButton", command=self.perform_single_translation)
         self.translate_button.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.overlay_button = ttk.Button(button_row, text="Overlay", command=self.perform_overlay_translation)
         self.overlay_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
         ttk.Button(button_row, text="Temizle", command=self.clear_results).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
-        ttk.Button(button_row, text="Pencereye Ac", command=self.open_popout_window).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
+        ttk.Button(button_row, text="Pencereye Aç", command=self.open_popout_window).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10, 0))
 
         summary = tk.Frame(control_card.body, bg=APP_THEME["surface"])
         summary.pack(fill=tk.X, pady=(14, 0))
         self.summary_label = tk.Label(summary, text=self.build_summary_text(), bg=APP_THEME["accent_soft"], fg=APP_THEME["accent_alt"], padx=14, pady=10, font=("Segoe UI", 10), anchor="w", justify=tk.LEFT)
         self.summary_label.pack(fill=tk.X)
 
-        results_card = CardFrame(parent, "Sonuclar", "Orijinal OCR ve duzenlenebilir ceviri alani yan yana.")
+        results_card = CardFrame(parent, "Sonuçlar", "Orijinal OCR ve düzenlenebilir çeviri alanı yan yana.")
         results_card.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
         results_card.body.rowconfigure(0, weight=1)
         results_card.body.columnconfigure(0, weight=1)
@@ -663,11 +711,11 @@ class TranslatorGUI:
         translated_panel.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
 
         self.build_text_panel(original_panel, "Orijinal Metin", "OCR sonucu", editable=False)
-        self.build_text_panel(translated_panel, "Ceviri", "Duzenlenebilir metin", editable=True)
+        self.build_text_panel(translated_panel, "Ceviri", "Düzenlenebilir metin", editable=True)
 
         feedback_bar = tk.Frame(results_card.body, bg=APP_THEME["surface"])
         feedback_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(14, 0))
-        ttk.Button(feedback_bar, text="Duzeltmeyi Gonder", command=self.submit_correction).pack(side=tk.LEFT)
+        ttk.Button(feedback_bar, text="Düzeltmeyi Gönder", command=self.submit_correction).pack(side=tk.LEFT)
         ttk.Button(feedback_bar, text="Gecmisi Ac", command=self.open_history).pack(side=tk.LEFT, padx=(8, 0))
 
         status_wrap = tk.Frame(parent, bg=APP_THEME["bg"])
@@ -677,7 +725,9 @@ class TranslatorGUI:
 
     def build_text_panel(self, parent, title, subtitle, editable):
         tk.Label(parent, text=title, bg=APP_THEME["surface"], fg=APP_THEME["text"], font=("Segoe UI Semibold", 11)).pack(anchor="w")
-        tk.Label(parent, text=subtitle, bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 8))
+        lbl = tk.Label(parent, text=subtitle, bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI", 9), justify=tk.LEFT)
+        lbl.pack(anchor="w", fill=tk.X, expand=True, pady=(2, 8))
+        lbl.bind("<Configure>", lambda e, l=lbl: l.configure(wraplength=e.width))
         widget = scrolledtext.ScrolledText(parent, wrap=tk.WORD, font=("Segoe UI", 11), bg=APP_THEME["panel"], fg=APP_THEME["text"], relief=tk.FLAT, padx=14, pady=14, insertbackground=APP_THEME["text"])
         widget.pack(fill=tk.BOTH, expand=True)
         if editable:
@@ -707,8 +757,12 @@ class TranslatorGUI:
         tk.Label(frame, text=title, bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI Semibold", 9)).pack(anchor="w")
         row = tk.Frame(frame, bg=APP_THEME["surface"])
         row.pack(fill=tk.X, pady=(6, 0))
+        buttons = {}
         for index, (label, value) in enumerate(options):
-            tk.Radiobutton(row, text=label, value=value, variable=variable, command=command, bg=APP_THEME["surface"], fg=APP_THEME["text"], selectcolor=APP_THEME["surface"], activebackground=APP_THEME["surface"], font=("Segoe UI", 10)).grid(row=0, column=index, sticky="w", padx=(0, 14))
+            radio = tk.Radiobutton(row, text=label, value=value, variable=variable, command=command, bg=APP_THEME["surface"], fg=APP_THEME["text"], selectcolor=APP_THEME["surface"], activebackground=APP_THEME["surface"], font=("Segoe UI", 10))
+            radio.grid(row=0, column=index, sticky="w", padx=(0, 14))
+            buttons[value] = radio
+        return buttons
 
     def build_summary_text(self):
         return f"OCR: {self.ocr_method_var.get()}   |   Ceviri: {self.translator_engine_var.get()}   |   Dil: {self.source_lang_var.get()} -> {self.target_lang_var.get()}   |   Yerlesim: {self.layout_mode_var.get()}"
@@ -786,6 +840,31 @@ class TranslatorGUI:
             self.gemini_quality_combo.configure(state=state)
         self.refresh_summary()
 
+    def pick_fallback_translator_engine(self):
+        if self.translator and self.translator.text_model:
+            return "gemini"
+        if self.translator and self.translator.google_translator_client:
+            return "google"
+        return "gemini"
+
+    def update_local_gemma_availability(self, notify=False):
+        if not self.translator:
+            return
+
+        is_available, reason = self.translator.get_local_gemma_availability()
+        local_button = self.translator_engine_buttons.get("local_gemma")
+        if local_button:
+            local_button.configure(state=tk.NORMAL if is_available else tk.DISABLED)
+
+        if hasattr(self, "local_gemma_hint_label"):
+            self.local_gemma_hint_label.configure(text="" if is_available else f"Yerel Gemma devre dışı: {reason}")
+
+        if not is_available and self.translator_engine_var.get() == "local_gemma":
+            self.translator_engine_var.set(self.pick_fallback_translator_engine())
+            self.refresh_summary()
+            if notify:
+                self.set_status("Yerel Gemma kullanılamıyor. Diğer çeviri motoruna geçildi.", "warning")
+
     def build_settings_payload(self):
         return {
             "theme": self.settings_manager.get("theme"),
@@ -842,10 +921,10 @@ class TranslatorGUI:
         self.show_persistent_border_var.set(new_state)
         if new_state:
             self.update_persistent_border()
-            self.set_status("Surekli cerceve acildi.", "success")
+            self.set_status("Sürekli çerçeve açıldı.", "success")
         else:
             self.destroy_persistent_border()
-            self.set_status("Surekli cerceve kapatildi.", "warning")
+            self.set_status("Sürekli çerçeve kapatildi.", "warning")
 
     def update_persistent_border(self):
         coords = self.get_coords()
@@ -931,7 +1010,7 @@ class TranslatorGUI:
 
         self.selection_canvas = tk.Canvas(self.selection_window, bg="black", highlightthickness=0)
         self.selection_canvas.pack(fill=tk.BOTH, expand=True)
-        self.selection_canvas.create_text(self.selection_window.winfo_screenwidth() // 2, 48, text="Fareyle ceviri yapilacak alani secin. Esc ile iptal edebilirsiniz.", fill="white", font=("Segoe UI Semibold", 16))
+        self.selection_canvas.create_text(self.selection_window.winfo_screenwidth() // 2, 48, text="Fareyle çeviri yapılacak alanı seçin. Esc ile iptal edebilirsiniz.", fill="white", font=("Segoe UI Semibold", 16))
 
         self.selection_canvas.bind("<ButtonPress-1>", self.on_mouse_down)
         self.selection_canvas.bind("<B1-Motion>", self.on_mouse_drag)
@@ -964,13 +1043,13 @@ class TranslatorGUI:
         height = abs(event.y - start_y)
         self.cancel_selection()
         if width < 10 or height < 10:
-            messagebox.showwarning("Kucuk Alan", "Secilen alan cok kucuk.")
+            messagebox.showwarning("Küçük Alan", "Seçilen alan çok küçük.")
             return
         self.left_var.set(str(int(left)))
         self.top_var.set(str(int(top)))
         self.width_var.set(str(int(width)))
         self.height_var.set(str(int(height)))
-        self.set_status("Alan guncellendi.", "success")
+        self.set_status("Alan güncellendi.", "success")
         if self.auto_translate_var.get():
             self.root.after(120, self.perform_single_translation)
 
@@ -994,23 +1073,23 @@ class TranslatorGUI:
     def perform_single_translation(self):
         region = self.get_coords()
         if not region:
-            messagebox.showerror("Gecersiz Giris", "Koordinatlar sayi olmali.")
+            messagebox.showerror("Geçersiz Giriş", "Koordinatlar sayı olmalı.")
             return
         self.set_busy(True)
         self.refresh_summary()
-        self.set_status("Ceviri baslatildi. OCR ve ceviri motorlari calisiyor.", "working")
+        self.set_status("Çeviri başlatıldı. OCR ve çeviri motorları çalışıyor.", "working")
         threading.Thread(target=self._translation_worker, args=(region,), daemon=True).start()
 
     def _translation_worker(self, region):
         try:
             results = self.translator.capture_and_translate_with_text_detection(region, self.source_lang_var.get(), self.target_lang_var.get(), self.ocr_method_var.get(), self.gemini_quality_var.get(), self.translator_engine_var.get(), PREPROCESSING_REVERSE.get(self.preprocessing_profile_var.get(), "normal"), self.layout_mode_var.get())
             if not results:
-                self.root.after(0, lambda: self.set_status("Metin bulunamadi veya ceviri uretilemedi.", "warning"))
+                self.root.after(0, lambda: self.set_status("Metin bulunamadı veya çeviri üretilemedi.", "warning"))
                 return
             original = "\n\n".join(item.get("original", "") for item in results)
             translated = "\n\n".join(item.get("translated", "") for item in results)
             self.root.after(0, self.update_text_areas, {"original": original, "translated": translated})
-            self.root.after(0, lambda: self.set_status(f"Ceviri tamamlandi. {len(results)} blok islendi.", "success"))
+            self.root.after(0, lambda: self.set_status(f"Çeviri tamamlandı. {len(results)} blok işlendi.", "success"))
         except Exception as error:
             self.root.after(0, lambda err=error: self.set_status(f"Hata: {err}", "error"))
         finally:
@@ -1019,26 +1098,26 @@ class TranslatorGUI:
     def perform_overlay_translation(self):
         region = self.get_coords()
         if not region:
-            messagebox.showerror("Gecersiz Giris", "Koordinatlar sayi olmali.")
+            messagebox.showerror("Geçersiz Giriş", "Koordinatlar sayı olmalı.")
             return
         self.set_busy(True)
-        self.set_status("Overlay icin ekran yakalaniyor.", "working")
+        self.set_status("Overlay için ekran yakalanıyor.", "working")
         threading.Thread(target=self._overlay_worker, args=(region,), daemon=True).start()
 
     def _overlay_worker(self, region):
         try:
             image = self.translator.capture_screen(region)
             if image is None:
-                raise RuntimeError("Ekran goruntusu alinamadi.")
+                raise RuntimeError("Ekran görüntüsü alınamadı.")
             results = self.translator.capture_and_translate_with_text_detection(region, self.source_lang_var.get(), self.target_lang_var.get(), self.ocr_method_var.get(), self.gemini_quality_var.get(), self.translator_engine_var.get(), PREPROCESSING_REVERSE.get(self.preprocessing_profile_var.get(), "normal"), self.layout_mode_var.get())
             original = "\n\n".join(item.get("original", "") for item in results)
             translated = "\n\n".join(item.get("translated", "") for item in results)
             self.root.after(0, self.update_text_areas, {"original": original, "translated": translated})
             self.root.after(0, lambda: DirectOverlayWindow(self, image, results, region, self.layout_mode_var.get() == "manga"))
-            self.root.after(0, lambda: self.set_status("Overlay gosterildi.", "success"))
+            self.root.after(0, lambda: self.set_status("Overlay gösterildi.", "success"))
         except Exception as error:
-            self.root.after(0, lambda err=error: messagebox.showerror("Overlay Hatasi", str(err)))
-            self.root.after(0, lambda err=error: self.set_status(f"Overlay hatasi: {err}", "error"))
+            self.root.after(0, lambda err=error: messagebox.showerror("Overlay Hatası", str(err)))
+            self.root.after(0, lambda err=error: self.set_status(f"Overlay hatası: {err}", "error"))
         finally:
             self.root.after(0, lambda: self.set_busy(False))
 
@@ -1048,15 +1127,15 @@ class TranslatorGUI:
         self.write_translated_text("")
         if self.popout_window and self.popout_window.winfo_exists():
             self.update_text_areas({"original": "", "translated": ""})
-        self.set_status("Sonuc panelleri temizlendi.", "ready")
+        self.set_status("Sonuç panelleri temizlendi.", "ready")
 
     def export_results(self):
         original = self.text_area_original.get("1.0", tk.END).strip()
         translated = self.text_area_translated.get("1.0", tk.END).strip()
         if not original and not translated:
-            messagebox.showwarning("Bos Sonuc", "Disa aktarilacak veri yok.")
+            messagebox.showwarning("Boş Sonuç", "Dışa aktarılacak veri yok.")
             return
-        filename = filedialog.asksaveasfilename(title="Sonuclari Kaydet", defaultextension=".txt", filetypes=[("Metin Dosyalari", "*.txt"), ("Tum Dosyalar", "*.*")])
+        filename = filedialog.asksaveasfilename(title="Sonuçları Kaydet", defaultextension=".txt", filetypes=[("Metin Dosyaları", "*.txt"), ("Tüm Dosyalar", "*.*")])
         if not filename:
             return
         try:
@@ -1067,28 +1146,28 @@ class TranslatorGUI:
                 handle.write("Ceviri\n")
                 handle.write("=" * 40 + "\n")
                 handle.write(translated + "\n")
-            self.set_status("Sonuclar dosyaya kaydedildi.", "success")
+            self.set_status("Sonuçlar dosyaya kaydedildi.", "success")
         except OSError as error:
-            messagebox.showerror("Kaydetme Hatasi", str(error))
+            messagebox.showerror("Kaydetme Hatası", str(error))
 
     def submit_correction(self):
         original = self.text_area_original.get("1.0", tk.END).strip()
         corrected = self.text_area_translated.get("1.0", tk.END).strip()
         if not original or not corrected:
-            messagebox.showwarning("Eksik Veri", "Gonderim icin hem orijinal hem de ceviri alani dolu olmali.")
+            messagebox.showwarning("Eksik Veri", "Gönderim için hem orijinal hem de çeviri alanı dolu olmalı.")
             return
         if not self.last_original_translation:
-            messagebox.showwarning("Eksik Veri", "Karsilastirilacak ilk ceviri bulunamadi.")
+            messagebox.showwarning("Eksik Veri", "Karşılaştırılacak ilk çeviri bulunamadı.")
             return
-        self.set_status("Duzeltme BigQuery icin gonderiliyor.", "working")
+        self.set_status("Düzeltme BigQuery için gönderiliyor.", "working")
         threading.Thread(target=self._submit_correction_worker, args=(original, corrected), daemon=True).start()
 
     def _submit_correction_worker(self, original, corrected):
         try:
             self.translator.log_correction_to_bigquery(original_text=original, original_translation=self.last_original_translation, corrected_translation=corrected)
-            self.root.after(0, lambda: self.set_status("Duzeltme gonderildi.", "success"))
+            self.root.after(0, lambda: self.set_status("Düzeltme gönderildi.", "success"))
         except Exception as error:
-            self.root.after(0, lambda err=error: self.set_status(f"Duzeltme gonderilemedi: {err}", "error"))
+            self.root.after(0, lambda err=error: self.set_status(f"Düzeltme gönderilemedi: {err}", "error"))
 
     def on_close(self):
         self.save_current_settings()

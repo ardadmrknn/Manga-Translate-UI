@@ -37,9 +37,10 @@ except ImportError:
     print("UYARI: 'google-cloud-bigquery' kütüphanesi bulunamadı. Analiz verileri kaydedilemeyecek.")
 try:
     import litert_lm
-except ImportError:
+    LITERT_LM_IMPORT_ERROR = ""
+except ImportError as import_error:
     litert_lm = None
-    print("UYARI: 'litert-lm' kütüphanesi bulunamadı. Yerel Gemma çeviri seçeneği çalışmayacak.")
+    LITERT_LM_IMPORT_ERROR = str(import_error)
 
 
 # DEBUG MODE
@@ -689,6 +690,16 @@ class ScreenTranslator:
             message += " LiteRT-LM Python tarafında Windows desteği resmi olarak tam oturmadığı için WSL2 ya da Linux ortamı gerekebilir."
         return message
 
+    def get_local_gemma_availability(self):
+        if litert_lm is None:
+            reason = "litert-lm paketi kurulu değil."
+            if LITERT_LM_IMPORT_ERROR:
+                reason += f" Import hatası: {LITERT_LM_IMPORT_ERROR}"
+            return False, reason
+        if not os.path.exists(self.local_model_path):
+            return False, f"Model dosyası bulunamadı: {self.local_model_path}"
+        return True, ""
+
     def _ensure_local_litert_engine(self):
         if self.local_llm_engine is not None:
             return self.local_llm_engine
@@ -697,11 +708,9 @@ class ScreenTranslator:
             if self.local_llm_engine is not None:
                 return self.local_llm_engine
 
-            if litert_lm is None:
-                raise RuntimeError("litert-lm paketi kurulu değil.")
-
-            if not os.path.exists(self.local_model_path):
-                raise RuntimeError(f"Model dosyası bulunamadı: {self.local_model_path}")
+            local_gemma_available, unavailable_reason = self.get_local_gemma_availability()
+            if not local_gemma_available:
+                raise RuntimeError(unavailable_reason)
 
             os.makedirs(self._local_llm_cache_dir, exist_ok=True)
 

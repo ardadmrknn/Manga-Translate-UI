@@ -1,34 +1,32 @@
-# Manga Translate UI
+# Manga Çevirici
 
-Windows odaklı, masaüstünde seçtiğiniz ekran bölgesinden metin okuyup anında çeviri yapan bir manga ve oyun çeviri aracı.
+Masaüstünde seçtiğiniz bir ekran alanından metni okuyup hızlıca çeviren, Windows odaklı bir manga ve oyun çeviri uygulaması.
 
-Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapabilir, ardından metni Gemini, Google Cloud Translate veya yerel Gemma modeli ile çevirebilir. Sonuçları normal metin alanında gösterebilir veya overlay pencereleri olarak ekranın üstüne yerleştirebilir.
+Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapar. Ardından metni Gemini, Google Cloud Translate ya da uygun olduğunda Yerel Gemma (LiteRT-LM) ile çevirir. Sonuçlar metin panellerinde gösterilebilir veya overlay olarak ekran üstüne yerleştirilebilir.
 
-## Özellikler
+## Öne Çıkan Özellikler
 
 - Seçili ekran alanından tek tıkla çeviri
-- Sistem genelinde çalışan kısayol tuşları
-- Manga modu ve oyun modu için farklı metin gruplama davranışı
-- Üç OCR seçeneği:
-  - Tesseract (local)
-  - Google Cloud Vision
-  - Gemini Vision
-- Üç çeviri seçeneği:
-  - Yerel Gemma (LiteRT-LM)
-  - Gemini
-  - Google Cloud Translate
+- Pencereye sığmayan ayar/kontrol bölümleri için dikey kaydırma (scroll)
+- Global kısayollar (keyboard paketi kuruluysa)
+- Manga ve oyun modu için farklı metin gruplama davranışı
+- Üç OCR motoru: Tesseract, Cloud Vision, Gemini Vision
+- Üç çeviri motoru: Yerel Gemma, Gemini, Google Cloud Translate
+- Yerel Gemma kullanılabilirlik kontrolü:
+  - `litert-lm` veya model dosyası yoksa seçenek arayüzde devre dışı görünür
+  - Çeviri motoru otomatik olarak Gemini (öncelik) veya Google Cloud seçeneğine geçirilir
 - Overlay çeviri görünümü
-- Çeviri geçmişi arama ve temizleme
-- Sonucu dışa aktarma
+- Çeviri geçmişi (arama/temizleme)
+- Sonuç dışa aktarma
 - Düzeltmeleri BigQuery'ye gönderme desteği
-- Kullanıcı ayarlarını saklama
+- Kullanıcı ayarlarını kalıcı saklama
 
-## Ekran Akışı
+## Hızlı Kullanım
 
-1. Uygulamayı açın.
+1. Uygulamayı başlatın.
 2. `F2` ile çevrilecek alanı seçin.
 3. OCR ve çeviri motorunu belirleyin.
-4. `F1` ile normal çeviri veya `F5` ile overlay çeviri çalıştırın.
+4. `F1` ile normal çeviri, `F5` ile overlay çeviri çalıştırın.
 5. Gerekirse çeviriyi düzenleyip düzeltme gönderin.
 
 ## Desteklenen Motorlar
@@ -36,20 +34,20 @@ Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapabilir, ardında
 ### OCR
 
 - `tesseract`: Yerel OCR, internet gerektirmez.
-- `cloud_vision`: Google Cloud Vision ile daha stabil OCR.
+- `cloud_vision`: Google Cloud Vision ile daha kararlı OCR.
 - `gemini`: Görselden yüksek kaliteli metin çıkarımı.
 
 ### Çeviri
 
 - `local_gemma`: Yerel model ile gizlilik odaklı çeviri.
-- `gemini`: Daha doğal ve bağlama duyarlı çeviri.
+- `gemini`: Bağlama duyarlı, akıcı çeviri.
 - `google`: Hızlı ve düşük maliyetli bulut çevirisi.
 
 ## Gereksinimler
 
 - Windows
 - Python 3
-- Tesseract OCR kurulu olmalı ve `PATH` içinde bulunmalı
+- Tesseract OCR (sisteme kurulu ve `PATH` içinde olmalı)
 - İsteğe bağlı olarak Google Cloud hesabı ve/veya Gemini API erişimi
 
 ## Kurulum
@@ -60,11 +58,11 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Tesseract ayrıca sisteminize kurulmalıdır. Kurulumdan sonra `tesseract` komutu terminalden çalışmalıdır.
+Tesseract ayrıca sisteme kurulmalıdır. Kurulumdan sonra `tesseract` komutunun terminalde çalıştığını doğrulayın.
 
 ## Ortam Değişkenleri
 
-Bulut servisleri kullanacaksanız anahtarları dosya içine yazmayın. Ortam değişkeni kullanın.
+Bulut servislerini kullanıyorsanız anahtarları kaynak koda yazmak yerine ortam değişkenleri üzerinden verin.
 
 ### Gemini
 
@@ -80,13 +78,13 @@ $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
 
 ### Yerel Gemma modeli
 
-İsterseniz model yolunu ortam değişkeni ile verebilirsiniz:
+Model yolunu isterseniz ortam değişkeniyle belirtebilirsiniz:
 
 ```powershell
 $env:LOCAL_LITERT_LM_MODEL_PATH="C:\path\to\gemma-4-E2B-it.litertlm"
 ```
 
-Varsayılan olarak uygulama proje içindeki `models/gemma-4-E2B-it.litertlm` yolunu dener.
+Varsayılan konum: `models/gemma-4-E2B-it.litertlm`
 
 ## Çalıştırma
 
@@ -101,7 +99,8 @@ py best_mangaceviri_gui.py
 - `F3`: Geçmişi aç
 - `F4`: Sürekli çerçeveyi aç/kapat
 - `F5`: Overlay çeviri
-- `Esc`: Aktif seçim veya bazı overlay işlemlerini iptal et
+- `Delete`: Overlay penceresini kapat
+- `Esc`: Aktif seçim veya overlay işlemlerini iptal et
 - `Ctrl+Q`: Uygulamadan çık
 
 ## Proje Yapısı
@@ -117,22 +116,16 @@ app.log                   Yerel log dosyası (repoya girmez)
 
 ## Güvenlik
 
-- API key'ler kaynak koda gömülü değildir.
+- API anahtarları kaynak koda gömülü değildir.
 - Gemini anahtarı `GOOGLE_API_KEY` üzerinden okunur.
-- Google Cloud kimlik bilgileri `GOOGLE_APPLICATION_CREDENTIALS` ile kullanılır.
-- Aşağıdaki dosyalar `.gitignore` ile repodan hariç tutulur:
-  - `.venv/`
-  - `app.log`
-  - `settings.json`
-  - `translation_history.json`
-  - `.env`
-  - olası credential JSON dosyaları
+- Google Cloud kimlik bilgileri `GOOGLE_APPLICATION_CREDENTIALS` üzerinden kullanılır.
+- `.venv`, ayar/geçmiş dosyaları ve olası kimlik bilgileri dosyaları repoya dahil edilmez.
 
 ## Notlar
 
-- LiteRT-LM tarafında Windows desteği ortama göre sorun çıkarabilir. Yerel Gemma motoru bazı sistemlerde WSL2 veya Linux isteyebilir.
-- Bulut motorları aktif değilse uygulama yine yerel Tesseract ile çalışabilir.
-- Google servislerini kullanırken ilgili API'lerin açık olduğundan emin olun.
+- `requirements.txt` içinde `litert-lm`, Windows için bilinçli olarak hariç tutulmuştur (`platform_system != "Windows"`).
+- Bu nedenle Windows'ta Yerel Gemma seçeneği çoğu ortamda devre dışı kalabilir; uygulama bunu otomatik tespit eder.
+- Yerel Gemma için WSL2/Linux ortamı daha uyumlu olabilir.
 
 ## Sorun Giderme
 
@@ -144,9 +137,13 @@ Tesseract kurulu değildir veya `PATH` içinde değildir.
 
 Seçtiğiniz çeviri motoru için gerekli ortam değişkeni tanımlı olmayabilir.
 
-### Yerel Gemma çalışmıyor
+### Yerel Gemma seçeneği devre dışı görünüyor
 
-Model dosyası yolu yanlış olabilir veya LiteRT-LM ortamınız Windows üzerinde uyumsuz olabilir.
+Muhtemel nedenler:
+
+- `litert-lm` paketi kurulu değil veya import edilemiyor
+- Model dosyası bulunamıyor
+- Windows ortamında LiteRT-LM uyumluluğu sınırlı
 
 ## Lisans
 
