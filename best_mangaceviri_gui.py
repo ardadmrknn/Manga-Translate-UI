@@ -659,8 +659,8 @@ class TranslatorGUI:
         tk.Label(preprocess_row, text="Ön İşleme", bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI Semibold", 9)).pack(anchor="w")
         ttk.Combobox(preprocess_row, state="readonly", values=PREPROCESSING_DISPLAY, textvariable=self.preprocessing_profile_var).pack(fill=tk.X, pady=(6, 0))
 
-        tk.Label(engine_card.body, text=f"Model: {os.path.basename(self.local_model_path)}", bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI", 9), wraplength=290, justify=tk.LEFT).pack(anchor="w", pady=(12, 0))
-        self.local_gemma_hint_label = tk.Label(engine_card.body, text="", bg=APP_THEME["surface"], fg=APP_THEME["warning"], font=("Segoe UI", 9), wraplength=290, justify=tk.LEFT)
+        tk.Label(engine_card.body, text=f"LiteRT model dosyası: {os.path.basename(self.local_model_path)}", bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI", 9), wraplength=290, justify=tk.LEFT).pack(anchor="w", pady=(12, 0))
+        self.local_gemma_hint_label = tk.Label(engine_card.body, text="", bg=APP_THEME["surface"], fg=APP_THEME["muted"], font=("Segoe UI", 9), wraplength=290, justify=tk.LEFT)
         self.local_gemma_hint_label.pack(anchor="w", pady=(6, 0))
 
         language_card = CardFrame(parent, "Dil ve Akış", "Kaynak ve hedef dili değiştirin; manga veya oyun modunu seçin.")
@@ -857,7 +857,11 @@ class TranslatorGUI:
             local_button.configure(state=tk.NORMAL if is_available else tk.DISABLED)
 
         if hasattr(self, "local_gemma_hint_label"):
-            self.local_gemma_hint_label.configure(text="" if is_available else f"Yerel Gemma devre dışı: {reason}")
+            if is_available:
+                runtime_info = self.translator.get_local_gemma_runtime_label()
+                self.local_gemma_hint_label.configure(fg=APP_THEME["muted"], text=f"Yerel Gemma hazır: {runtime_info}")
+            else:
+                self.local_gemma_hint_label.configure(fg=APP_THEME["warning"], text=f"Yerel Gemma devre dışı: {reason}")
 
         if not is_available and self.translator_engine_var.get() == "local_gemma":
             self.translator_engine_var.set(self.pick_fallback_translator_engine())

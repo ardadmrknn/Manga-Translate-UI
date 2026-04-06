@@ -14,5 +14,5 @@ litert-lm; platform_system != "Windows"
 # Install the Tesseract OCR application separately and add it to PATH.
 
 # Note for local Gemma translation:
-# LiteRT-LM currently does not provide a working dependency set for this Windows venv.
-# Use Linux/WSL2 for local Gemma support, or switch translator engine to Google/Gemini on Windows.
+# On non-Windows, LiteRT-LM can be used with a .litertlm model file.
+# On Windows, local_gemma can run through Ollama (install Ollama and pull a Gemma model).

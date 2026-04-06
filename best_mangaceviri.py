@@ -4,6 +4,7 @@ import json
 import datetime
 import platform
 import logging
+import shutil
 from PIL import Image
 import mss
 import html
@@ -11,6 +12,8 @@ import io
 import pytesseract
 import cv2
 import numpy as np
+import urllib.error
+import urllib.request
 from functools import lru_cache
 from threading import Lock
 
@@ -158,6 +161,8 @@ class ScreenTranslator:
         self.local_llm_error = ""
         self._local_llm_lock = Lock()
         self._local_llm_cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".litert_cache")
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma3:1b").strip()
         
         # Çeviri geçmişi
         self.history = TranslationHistory()
@@ -690,7 +695,7 @@ class ScreenTranslator:
             message += " LiteRT-LM Python tarafında Windows desteği resmi olarak tam oturmadığı için WSL2 ya da Linux ortamı gerekebilir."
         return message
 
-    def get_local_gemma_availability(self):
+    def _check_litert_gemma_availability(self):
         if litert_lm is None:
             reason = "litert-lm paketi kurulu değil."
             if LITERT_LM_IMPORT_ERROR:
@@ -699,6 +704,98 @@ class ScreenTranslator:
         if not os.path.exists(self.local_model_path):
             return False, f"Model dosyası bulunamadı: {self.local_model_path}"
         return True, ""
+
+    def _http_json(self, endpoint, payload=None, timeout=45):
+        url = f"{self.ollama_base_url}{endpoint}"
+        body = None
+        headers = {"Content-Type": "application/json"}
+
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+
+        request = urllib.request.Request(
+            url=url,
+            data=body,
+            headers=headers,
+            method="POST" if payload is not None else "GET",
+        )
+
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    def _detect_ollama_gemma_model(self):
+        preferred = self.ollama_model
+
+        try:
+            tags_payload = self._http_json("/api/tags", payload=None, timeout=15)
+        except Exception as error:
+            return "", f"Ollama API erişilemedi ({self.ollama_base_url}): {error}"
+
+        models = tags_payload.get("models", [])
+        model_names = [item.get("name", "") for item in models if item.get("name")]
+
+        if preferred and preferred in model_names and "gemma" in preferred.lower():
+            return preferred, ""
+
+        for model_name in model_names:
+            if "gemma" in model_name.lower():
+                self.ollama_model = model_name
+                return model_name, ""
+
+        if preferred and preferred not in model_names:
+            return "", f"Ollama içinde `{preferred}` modeli bulunamadı. `ollama pull gemma3:1b` çalıştırın."
+
+        return "", "Ollama içinde Gemma modeli bulunamadı. `ollama pull gemma3:1b` çalıştırın."
+
+    def _check_ollama_gemma_availability(self):
+        if shutil.which("ollama") is None:
+            return False, "Ollama kurulu değil veya PATH içinde değil."
+
+        model_name, reason = self._detect_ollama_gemma_model()
+        if not model_name:
+            return False, reason
+
+        return True, ""
+
+    def _get_ollama_gemma_candidates(self):
+        model_name, reason = self._detect_ollama_gemma_model()
+        if not model_name:
+            return [], reason
+
+        tags_payload = self._http_json("/api/tags", payload=None, timeout=15)
+        models = tags_payload.get("models", [])
+        gemma_models = [item.get("name", "") for item in models if "gemma" in item.get("name", "").lower()]
+
+        candidates = []
+        if self.ollama_model and self.ollama_model in gemma_models:
+            candidates.append(self.ollama_model)
+        for gemma_model in gemma_models:
+            if gemma_model not in candidates:
+                candidates.append(gemma_model)
+
+        return candidates, ""
+
+    def get_local_gemma_availability(self):
+        litert_ok, litert_reason = self._check_litert_gemma_availability()
+        if litert_ok:
+            return True, ""
+
+        ollama_ok, ollama_reason = self._check_ollama_gemma_availability()
+        if ollama_ok:
+            return True, ""
+
+        return False, f"LiteRT: {litert_reason} | Ollama: {ollama_reason}"
+
+    def get_local_gemma_runtime_label(self):
+        litert_ok, _ = self._check_litert_gemma_availability()
+        if litert_ok:
+            return f"LiteRT-LM ({os.path.basename(self.local_model_path)})"
+
+        ollama_ok, _ = self._check_ollama_gemma_availability()
+        if ollama_ok:
+            return f"Ollama ({self.ollama_model})"
+
+        return ""
 
     def _ensure_local_litert_engine(self):
         if self.local_llm_engine is not None:
@@ -739,10 +836,7 @@ class ScreenTranslator:
                 parts.append(item['text'])
         return ''.join(parts).strip()
 
-    def translate_text_with_local_gemma(self, text, source_lang, target_lang):
-        if not text:
-            return ""
-
+    def _translate_text_with_litert(self, text, source_lang, target_lang):
         engine = self._ensure_local_litert_engine()
         system_messages = [
             {
@@ -761,22 +855,86 @@ class ScreenTranslator:
             f"{text}"
         )
 
-        try:
-            with engine.create_conversation(messages=system_messages) as conversation:
-                response = conversation.send_message(
+        with engine.create_conversation(messages=system_messages) as conversation:
+            response = conversation.send_message(
+                {
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'text',
+                            'text': prompt,
+                        }
+                    ],
+                }
+            )
+
+        translated_text = self._extract_litert_text(response)
+        if not translated_text:
+            raise RuntimeError('Model boş yanıt döndürdü.')
+        return translated_text
+
+    def _translate_text_with_ollama(self, text, source_lang, target_lang):
+        candidates, reason = self._get_ollama_gemma_candidates()
+        if not candidates:
+            raise RuntimeError(reason)
+
+        last_error = ""
+        for model_name in candidates:
+            payload = {
+                "model": model_name,
+                "stream": False,
+                "messages": [
                     {
-                        'role': 'user',
-                        'content': [
-                            {
-                                'type': 'text',
-                                'text': prompt,
-                            }
-                        ],
-                    }
-                )
-            translated_text = self._extract_litert_text(response)
-            if not translated_text:
-                raise RuntimeError('Model boş yanıt döndürdü.')
+                        "role": "system",
+                        "content": "You are an expert manga and game translator. Reply with translation only.",
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Translate the following text from {source_lang} to {target_lang}. "
+                            "Return only the translated text. Preserve tone, names, and speech bubble brevity when possible.\n\n"
+                            f"{text}"
+                        ),
+                    },
+                ],
+                "options": {
+                    "temperature": 0.2,
+                },
+            }
+
+            try:
+                response = self._http_json("/api/chat", payload=payload, timeout=90)
+                translated_text = (response.get("message", {}).get("content", "") or "").strip()
+                if not translated_text:
+                    raise RuntimeError("Ollama boş yanıt döndürdü.")
+                self.ollama_model = model_name
+                return translated_text
+            except urllib.error.HTTPError as error:
+                details = ""
+                try:
+                    details = error.read().decode("utf-8", errors="ignore")
+                except Exception:
+                    details = ""
+                last_error = f"{model_name}: HTTP {error.code} {details}".strip()
+                continue
+            except urllib.error.URLError as error:
+                raise RuntimeError(f"Ollama bağlantı hatası: {error}") from error
+            except Exception as error:
+                last_error = f"{model_name}: {error}"
+                continue
+
+        raise RuntimeError(f"Ollama Gemma modelleri yanıt veremedi. Son hata: {last_error}")
+
+    def translate_text_with_local_gemma(self, text, source_lang, target_lang):
+        if not text:
+            return ""
+
+        try:
+            litert_ok, _ = self._check_litert_gemma_availability()
+            if litert_ok:
+                translated_text = self._translate_text_with_litert(text, source_lang, target_lang)
+            else:
+                translated_text = self._translate_text_with_ollama(text, source_lang, target_lang)
             return translated_text
         except Exception as e:
             self.local_llm_error = self._build_local_llm_error_message(e)

@@ -2,7 +2,7 @@
 
 Masaüstünde seçtiğiniz bir ekran alanından metni okuyup hızlıca çeviren, Windows odaklı bir manga ve oyun çeviri uygulaması.
 
-Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapar. Ardından metni Gemini, Google Cloud Translate ya da uygun olduğunda Yerel Gemma (LiteRT-LM) ile çevirir. Sonuçlar metin panellerinde gösterilebilir veya overlay olarak ekran üstüne yerleştirilebilir.
+Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapar. Ardından metni Gemini, Google Cloud Translate ya da uygun olduğunda Yerel Gemma (LiteRT-LM veya Ollama Gemma) ile çevirir. Sonuçlar metin panellerinde gösterilebilir veya overlay olarak ekran üstüne yerleştirilebilir.
 
 ## Öne Çıkan Özellikler
 
@@ -13,7 +13,8 @@ Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapar. Ardından me
 - Üç OCR motoru: Tesseract, Cloud Vision, Gemini Vision
 - Üç çeviri motoru: Yerel Gemma, Gemini, Google Cloud Translate
 - Yerel Gemma kullanılabilirlik kontrolü:
-  - `litert-lm` veya model dosyası yoksa seçenek arayüzde devre dışı görünür
+  - Önce LiteRT-LM + `.litertlm` model dosyası denenir
+  - LiteRT uygun değilse Ollama API üzerinden Gemma modeline otomatik fallback yapılır
   - Çeviri motoru otomatik olarak Gemini (öncelik) veya Google Cloud seçeneğine geçirilir
 - Overlay çeviri görünümü
 - Çeviri geçmişi (arama/temizleme)
@@ -40,6 +41,8 @@ Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapar. Ardından me
 ### Çeviri
 
 - `local_gemma`: Yerel model ile gizlilik odaklı çeviri.
+  - LiteRT-LM modeli varsa onu kullanır.
+  - Yoksa Ollama'daki Gemma modeli ile çalışır.
 - `gemini`: Bağlama duyarlı, akıcı çeviri.
 - `google`: Hızlı ve düşük maliyetli bulut çevirisi.
 
@@ -48,6 +51,7 @@ Uygulama; Tesseract, Google Cloud Vision veya Gemini ile OCR yapar. Ardından me
 - Windows
 - Python 3
 - Tesseract OCR (sisteme kurulu ve `PATH` içinde olmalı)
+- Yerel Gemma için (Windows'ta önerilen): Ollama + bir Gemma modeli
 - İsteğe bağlı olarak Google Cloud hesabı ve/veya Gemini API erişimi
 
 ## Kurulum
@@ -85,6 +89,19 @@ $env:LOCAL_LITERT_LM_MODEL_PATH="C:\path\to\gemma-4-E2B-it.litertlm"
 ```
 
 Varsayılan konum: `models/gemma-4-E2B-it.litertlm`
+
+Windows'ta Ollama fallback kullanacaksanız:
+
+```powershell
+ollama pull gemma3:1b
+```
+
+İsteğe bağlı ortam değişkenleri:
+
+```powershell
+$env:OLLAMA_BASE_URL="http://127.0.0.1:11434"
+$env:OLLAMA_MODEL="gemma3:1b"
+```
 
 ## Çalıştırma
 
@@ -124,8 +141,8 @@ app.log                   Yerel log dosyası (repoya girmez)
 ## Notlar
 
 - `requirements.txt` içinde `litert-lm`, Windows için bilinçli olarak hariç tutulmuştur (`platform_system != "Windows"`).
-- Bu nedenle Windows'ta Yerel Gemma seçeneği çoğu ortamda devre dışı kalabilir; uygulama bunu otomatik tespit eder.
-- Yerel Gemma için WSL2/Linux ortamı daha uyumlu olabilir.
+- Windows'ta Yerel Gemma varsayılan olarak Ollama fallback ile çalışır.
+- Ollama'da bir Gemma modeli yoksa `local_gemma` seçeneği devre dışı kalır.
 
 ## Sorun Giderme
 
@@ -143,7 +160,8 @@ Muhtemel nedenler:
 
 - `litert-lm` paketi kurulu değil veya import edilemiyor
 - Model dosyası bulunamıyor
-- Windows ortamında LiteRT-LM uyumluluğu sınırlı
+- Ollama kurulu değil, çalışmıyor veya `PATH` içinde değil
+- Ollama içinde Gemma modeli yok (ör: `ollama pull gemma3:1b`)
 
 ## Lisans
 
